@@ -201,8 +201,7 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
   , mempoolRecent$ = reply('recent')
 
   // Top holders data
-  // TODO: Uncomment when top-holders endpoint is implemented
-  // , topHolders$ = reply('top-holders').startWith(null)
+  , topHolders$ = reply('top-holders').startWith(null)
 
   // dashboard
   , dashboardState$ = O.combineLatest(blocks$, mempoolRecent$, (blks, txs) => 
@@ -287,8 +286,7 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
                      , goAddr$, addr$, addrTxs$, addrQR$
                      , goScripthash$, scripthash$, scripthashTxs$, scripthashQR$
                      , assetMap$, assetList$, goAssetList$, goAsset$, asset$, assetTxs$, unblinded$
-                     // TODO: Uncomment when top-holders endpoint is implemented
-                     // , topHolders$
+                     , topHolders$
                      , isReady$, loading$, page$, view$, title$, theme$
                      })
 
@@ -378,8 +376,7 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
     .mapTo(                 { category: 'recent',     method: 'GET', path: '/mempool/recent', bg: true })
 
     // fetch top holders data
-    // TODO: Uncomment when top-holders endpoint is implemented
-    // , goTopHolders$.mapTo(      { category: 'top-holders', method: 'GET', path: '/top-holders' })
+    , goTopHolders$.mapTo(      { category: 'top-holders', method: 'GET', path: '/top-holders' })
 
     , goHome$.flatMap(_ =>  [{ category: 'blocks',    method: 'GET', path: '/blocks' }
                               , { category: 'recent',    method: 'GET', path: '/mempool/recent' }])
