@@ -3,11 +3,13 @@ export { recentBlocks }       from './blocks-all'
 export { recentTxs }          from './transactions-all'
 export { default as block }   from './block'
 export { default as addr }    from './addr'
+export { default as scripthash }    from './scripthash'
 export { default as tx }      from './tx'
 export { default as pushtx }  from './pushtx'
 export { default as scan }    from './scan'
 export { default as mempool } from './mempool'
 export { default as loading } from './loading'
+export { default as topHolders } from './top-holders'
 export { error, notFound }    from './error'
 
 // Elements

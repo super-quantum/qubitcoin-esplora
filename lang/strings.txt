@@ -174,3 +174,15 @@ Weight (KWU)
 Weight units
 Witness
 Yes
+Top Qubitcoin Holders
+Top Holders
+Ranking of addresses with the highest Qubitcoin balances
+Rank
+Address
+Balance
+Txn Count
+Percentage
+Top 100 Qubitcoin Addresses by Balance
+API Warning:
+Unable to fetch real data from API. Showing demo data instead.
+View more blocks
