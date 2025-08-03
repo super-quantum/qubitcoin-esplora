@@ -29,6 +29,13 @@ export const formatAssetAmount = (value, precision=0, t) =>
     {formatNumber(precision > 0 ? moveDec(value, -precision) : value, precision)}
   </span>
 
+export const roundNumber = (n, precision) => {
+  if (typeof n === 'string') return RoundNumber(Number(n), precision)
+
+  const formatted = n.toLocaleString('en-US', { minimumFractionDigits: precision, maximumFractionDigits: precision })
+  return formatted.replace(/\.?0+$/, '')
+}
+
 export const formatOutAmount = (vout, { t, assetMap }, shortDisplay=false) => {
   if (vout.value == null) return t`Confidential`
 

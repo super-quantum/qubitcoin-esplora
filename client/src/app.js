@@ -16,7 +16,7 @@ if (process.browser) {
 const apiBase = (process.env.API_URL || '/api').replace(/\/+$/, '')
     , setBase = ({ path, ...r }) => ({ ...r, url: path.includes('://') || path.startsWith('./') ? path : apiBase + path })
 
-const reservedPaths = [ 'mempool', 'assets', 'search' ]
+const reservedPaths = [ 'mempool', 'assets', 'search', 'top-holders', 'scripthash' ]
 
 // Make driver source observables rxjs5-compatible via rxjs-compat
 setAdapt(stream => O.from(stream))
@@ -39,12 +39,18 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
     , last_txids: parseHashes(loc.query.txids)
     , est_chain_seen_count: +loc.query.c || 0
     })).map(processGoAddr)
+  , goScripthash$   = route('/scripthash/:hash').map(loc => ({
+      scripthash: loc.params.hash
+    , last_txids: parseHashes(loc.query.txids)
+    , est_chain_seen_count: +loc.query.c || 0
+    })).map(processGoAddr)
   , goTx$     = route('/tx/:txid').map(loc => loc.params.txid).filter(isHash256)
   , goPush$   = route('/tx/push')
   , goRecent$ = route('/tx/recent')
   , goScan$   = route('/scan-qr').mapTo(true)
   , goMempool$= route('/mempool')
   , goSearch$ = route('/search').map(loc => loc.query.q).filter(Boolean)
+  , goTopHolders$ = route('/top-holders')
 
   // Elements only
   , goAsset$ = !process.env.IS_ELEMENTS ? O.empty() : route('/asset/:asset_id').map(loc => ({
@@ -90,6 +96,8 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
   , moreATxs$   = click('[data-loadmore-txs-addr]').map(d => ({ addr: d.loadmoreTxsAddr, last_txid: d.loadmoreTxsLastTxid }))
 
   , moreSTxs$   = click('[data-loadmore-txs-asset]').map(d => ({ asset_id: d.loadmoreTxsAsset, last_txid: d.loadmoreTxsLastTxid }))
+
+  , moreScripthashTxs$   = click('[data-loadmore-txs-scripthash]').map(d => ({ scripthash: d.loadmoreTxsScripthash, last_txid: d.loadmoreTxsLastTxid }))
 
   , lang$ = storage.local.getItem('lang').first().map(lang => lang || defaultLang)
       .concat(on('select[name=lang]', 'input').map(e => e.target.value))
@@ -161,6 +169,17 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
     , goAddr$.map(_ => S => null)
     ).startWith(null).scan((S, mod) => mod(S))
 
+  // Scripthash and associated txs
+  , scripthash$ = reply('scripthash')
+      .withLatestFrom(goScripthash$, (scripthash, goScripthash) => ({ ...scripthash, display_scripthash: goScripthash.display_addr }))
+      .merge(goScripthash$.mapTo(null))
+  , scripthashQR$ = scripthash$.filter(Boolean).map(scripthash => scripthash.display_scripthash).flatMap(makeAddressQR)
+  , scripthashTxs$ = O.merge(
+      reply('scripthash-txs').map(txs => S => txs)
+    , reply('scripthash-txs-more').map(txs => S => [ ...S, ...txs ])
+    , goScripthash$.map(_ => S => null)
+    ).startWith(null).scan((S, mod) => mod(S))
+
   // Single TX
   , tx$ = reply('tx').merge(goTx$.mapTo(null)).startWith(null)
 
@@ -180,6 +199,10 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
   // Mempool backlog stats
   , mempool$ = reply('mempool').startWith(null)
   , mempoolRecent$ = reply('recent')
+
+  // Top holders data
+  // TODO: Uncomment when top-holders endpoint is implemented
+  // , topHolders$ = reply('top-holders').startWith(null)
 
   // dashboard
   , dashboardState$ = O.combineLatest(blocks$, mempoolRecent$, (blks, txs) => 
@@ -231,10 +254,12 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
                   , block$.filter(notNully).mapTo('block')
                   , tx$.filter(notNully).mapTo('tx')
                   , addr$.filter(notNully).mapTo('addr')
+                  , scripthash$.filter(notNully).mapTo('scripthash')
                   , asset$.filter(notNully).mapTo('asset')
                   , goPush$.mapTo('pushtx')
                   , goScan$.mapTo('scan')
                   , goMempool$.mapTo('mempool')
+                  , goTopHolders$.mapTo('topHolders')
                   , goAssetList$.mapTo('assetList')
                   , error$.mapTo('error'))
       .combineLatest(isReady$, loading$, (view, isReady, loading) =>
@@ -245,10 +270,12 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
                    , block$.filter(notNully).withLatestFrom(t$, (block, t) => t`Block #${block.height}: ${block.id}`)
                    , tx$.filter(notNully).withLatestFrom(t$, (tx, t) => t`Transaction: ${tx.txid}`)
                    , addr$.filter(notNully).withLatestFrom(goAddr$, t$, (_, goAddr, t) => t`Address: ${goAddr.display_addr}`)
+                   , scripthash$.filter(notNully).withLatestFrom(goScripthash$, t$, (_, goScripthash, t) => t`Script Hash: ${goScripthash.display_addr}`)
                    , asset$.filter(notNully).withLatestFrom(t$, (asset, t) => t`Asset: ${asset.asset_id}`)
                    , goAssetList$.withLatestFrom(t$, (_, t) => t`Registered assets`)
                    , goPush$.withLatestFrom(t$, (_, t) => t`Broadcast transaction`)
                    , goMempool$.withLatestFrom(t$, (_, t) => t`Mempool`)
+                   , goTopHolders$.withLatestFrom(t$, (_, t) => t`Top Qubitcoin Holders`)
                    , goRecent$.withLatestFrom(t$, (_, t) => t`Recent transactions`))
 
   // App state
@@ -258,7 +285,10 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
                      , mempool$, mempoolRecent$, feeEst$
                      , tx$, txAnalysis$, openTx$
                      , goAddr$, addr$, addrTxs$, addrQR$
+                     , goScripthash$, scripthash$, scripthashTxs$, scripthashQR$
                      , assetMap$, assetList$, goAssetList$, goAsset$, asset$, assetTxs$, unblinded$
+                     // TODO: Uncomment when top-holders endpoint is implemented
+                     // , topHolders$
                      , isReady$, loading$, page$, view$, title$, theme$
                      })
 
@@ -290,6 +320,12 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
                               ? { category: 'addr-txs',   method: 'GET', path: `/address/${d.addr}/txs/chain/${last(d.last_txids)}` }
                               : { category: 'addr-txs',   method: 'GET', path: `/address/${d.addr}/txs` }])
 
+    // fetch scripthash and its txs
+    , goScripthash$.flatMap(d     => [{ category: 'scripthash',    method: 'GET', path: `/scripthash/${d.scripthash}` }
+                              , d.last_txids.length
+                              ? { category: 'scripthash-txs',   method: 'GET', path: `/scripthash/${d.scripthash}/txs/chain/${last(d.last_txids)}` }
+                              : { category: 'scripthash-txs',   method: 'GET', path: `/scripthash/${d.scripthash}/txs` }])
+
     // fetch list of blocks for homepage
     , O.merge(goBlocks$, moreBlocks$)
         //.merge(tickWhileViewing(5000, 'recentBlocks', view$).mapTo({}))
@@ -300,6 +336,9 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
 
     // fetch more txs for address page
     , moreATxs$.map(d       => ({ category: 'addr-txs-more', method: 'GET', path: `/address/${d.addr}/txs/chain/${d.last_txid}` }))
+
+    // fetch more txs for scripthash page
+    , moreScripthashTxs$.map(d       => ({ category: 'scripthash-txs-more', method: 'GET', path: `/scripthash/${d.scripthash}/txs/chain/${d.last_txid}` }))
 
     // fetch block by height
     , goHeight$.map(n       => ({ category: 'height',     method: 'GET', path: `/block-height/${n}` }))
@@ -337,6 +376,10 @@ export default function main({ DOM, HTTP, route, storage, scanner: scan$, search
     // ... and every 5 seconds while dashBoard remains open
     , tickWhileViewing(5000, 'dashBoard', view$)
     .mapTo(                 { category: 'recent',     method: 'GET', path: '/mempool/recent', bg: true })
+
+    // fetch top holders data
+    // TODO: Uncomment when top-holders endpoint is implemented
+    // , goTopHolders$.mapTo(      { category: 'top-holders', method: 'GET', path: '/top-holders' })
 
     , goHome$.flatMap(_ =>  [{ category: 'blocks',    method: 'GET', path: '/blocks' }
                               , { category: 'recent',    method: 'GET', path: '/mempool/recent' }])
