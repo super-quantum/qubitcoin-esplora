@@ -46,7 +46,7 @@ export default ({ t, loading, error, page, topHolders: holders, ...S }) => {
                   <div className="holders-table-cell" data-label={t`Rank`}>{holder.rank}</div>
                   <div className="holders-table-cell highlighted-text" data-label={t`Address`}>{holder.address.slice(0, 10)}...{holder.address.slice(-10)}</div>
                   <div className="holders-table-cell" data-label={t`Balance`}>
-                    <span className="font-weight-bold">{roundNumber(holder.balance, 4)} QBTC</span>
+                    <span className="font-weight-bold">{roundNumber(holder.balance, 4)} QTC</span>
                   </div>
                   <div className="holders-table-cell" data-label={t`Percentage`}>{holder.percentage}%</div>
                   <div className="holders-table-cell" data-label={t`Txn Count`}>{holder.tx_count}</div>
